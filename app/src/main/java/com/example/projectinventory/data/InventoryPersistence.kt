@@ -9,11 +9,20 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory_items")
     fun getAllItems(): Flow<List<InventoryItemEntity>>
 
+    @Query("SELECT * FROM inventory_items")
+    suspend fun getAllItemsList(): List<InventoryItemEntity>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: InventoryItemEntity)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertItems(items: List<InventoryItemEntity>)
+
     @Update
     suspend fun updateItem(item: InventoryItemEntity)
+
+    @Update
+    suspend fun updateItems(items: List<InventoryItemEntity>)
 
     @Query("DELETE FROM inventory_items")
     suspend fun deleteAll()
@@ -23,6 +32,9 @@ interface InventoryDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertJob(job: JobEntity)
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertJobs(jobs: List<JobEntity>)
 
     @Delete
     suspend fun deleteJob(job: JobEntity)
@@ -36,7 +48,8 @@ data class InventoryItemEntity(
     val status: String,
     val serial: String,
     val currentJobId: String?,
-    val imageUrl: String?
+    val imageUrl: String?,
+    val dailyRate: Double = 0.0
 )
 
 @Entity(tableName = "jobs")
@@ -52,7 +65,7 @@ data class JobEntity(
     val reminderEnabled: Boolean
 )
 
-@Database(entities = [InventoryItemEntity::class, JobEntity::class], version = 4)
+@Database(entities = [InventoryItemEntity::class, JobEntity::class], version = 11)
 abstract class InventoryDatabase : RoomDatabase() {
     abstract fun inventoryDao(): InventoryDao
 

@@ -7,7 +7,12 @@ enum class ItemType(val displayName: String, val prefix: String) {
     MIC("Mic", "MIC"),
     CABLE("Cable", "CBL"),
     STAND("Stand", "STD"),
-    MIXER("Mixer", "MIX")
+    MIXER("Mixer", "MIX"),
+    LIGHT("Lighting", "LGT"),
+    BACKLINE("Backline", "BKL"),
+    VISUAL("Visual/LED", "VSL"),
+    RIGGING("Rigging/Truss", "RIG"),
+    POWER("Power Distro", "PWR")
 }
 
 enum class ItemStatus(val displayName: String, val emoji: String) {
@@ -17,12 +22,12 @@ enum class ItemStatus(val displayName: String, val emoji: String) {
     REPAIRING("กำลังซ่อม", "🟠")
 }
 
-enum class JobPreset(val displayName: String) {
-    TALK("งานพูด/สัมมนา"),
-    BAND("วงดนตรี"),
-    DJ("DJ"),
-    WEDDING("งานแต่ง"),
-    OUTDOOR("งานกลางแจ้ง")
+enum class JobPreset(val displayName: String, val basePrice: Double) {
+    TALK("งานพูด/สัมมนา", 15000.0),
+    BAND("วงดนตรี", 45000.0),
+    DJ("DJ", 25000.0),
+    WEDDING("งานแต่ง", 35000.0),
+    OUTDOOR("งานกลางแจ้ง", 85000.0)
 }
 
 data class Job(
@@ -44,8 +49,24 @@ data class InventoryItem(
     val status: ItemStatus = ItemStatus.AVAILABLE,
     val serial: String = generateSerial(type),
     val imageUrl: String? = null,
-    val currentJobId: String? = null // ผูกกับ Job เมื่อสถานะเป็น BUSY
+    val currentJobId: String? = null,
+    val dailyRate: Double = getDefaultRate(type)
 )
+
+fun getDefaultRate(type: ItemType): Double {
+    return when (type) {
+        ItemType.SPEAKER -> 3500.0
+        ItemType.MIC -> 1500.0
+        ItemType.CABLE -> 100.0
+        ItemType.STAND -> 200.0
+        ItemType.MIXER -> 15000.0
+        ItemType.LIGHT -> 2500.0
+        ItemType.BACKLINE -> 5000.0
+        ItemType.VISUAL -> 1200.0
+        ItemType.RIGGING -> 1500.0
+        ItemType.POWER -> 3000.0
+    }
+}
 
 fun generateSerial(type: ItemType): String {
     val randomPart = (100000..999999).random()

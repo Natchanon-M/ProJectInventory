@@ -48,6 +48,9 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
     
     // New State for Drill-down
     var selectedJobForDetails by remember { mutableStateOf<Job?>(null) }
+    var selectedTypeForDetails by remember { mutableStateOf<ItemType?>(null) }
+    var selectedTypeInJob by remember { mutableStateOf<ItemType?>(null) }
+
 
     Scaffold(
         containerColor = Background,
@@ -55,8 +58,16 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
             Column(modifier = Modifier.background(Surface)) {
                 CenterAlignedTopAppBar(
                     title = { 
+                        val title = when {
+                            selectedJobForDetails != null -> {
+                                if (selectedTypeInJob != null) selectedTypeInJob!!.displayName
+                                else selectedJobForDetails!!.name
+                            }
+                            selectedTypeForDetails != null -> selectedTypeForDetails!!.displayName
+                            else -> "INVENTORY"
+                        }
                         Text(
-                            if (selectedJobForDetails != null) selectedJobForDetails!!.name else "INVENTORY", 
+                            title, 
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.Black,
                                 letterSpacing = 2.sp
@@ -64,8 +75,16 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                         ) 
                     },
                     navigationIcon = {
-                        if (selectedJobForDetails != null) {
-                            IconButton(onClick = { selectedJobForDetails = null }) {
+                        if (selectedJobForDetails != null || selectedTypeForDetails != null) {
+                            IconButton(onClick = { 
+                                if (selectedJobForDetails != null && selectedTypeInJob != null) {
+                                    selectedTypeInJob = null
+                                } else {
+                                    selectedJobForDetails = null 
+                                    selectedTypeForDetails = null
+                                    selectedTypeInJob = null
+                                }
+                            }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                             }
                         }
@@ -73,7 +92,7 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = Surface)
                 )
                 
-                if (selectedJobForDetails == null) {
+                if (selectedJobForDetails == null && selectedTypeForDetails == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -129,24 +148,34 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                 .fillMaxSize()
         ) {
             AnimatedContent(
-                targetState = Pair(selectedTab, selectedJobForDetails),
+                targetState = Triple(selectedTab, selectedJobForDetails, selectedTypeForDetails),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 label = "ContentTransition"
-            ) { (tab, jobDetails) ->
+            ) { (tab, jobDetails, typeDetails) ->
                 Column {
                     if (tab == 0 && jobDetails == null) {
-                        SearchBar(searchQuery) { searchQuery = it }
-                        InventoryList(
-                            items = if (searchQuery.isBlank()) items 
-                                    else items.filter { it.name.contains(searchQuery, ignoreCase = true) || it.serial.contains(searchQuery, ignoreCase = true) },
-                            jobs = jobs,
-                            onQRCodeClick = { selectedItemForQRCode = it },
-                            onCheckOut = { selectedItemForCheckOut = it },
-                            onCheckIn = { selectedItemForCheckIn = it },
-                            onSendToRepair = { selectedItemForRepair = it },
-                            onReturnFromRepair = { viewModel.returnFromRepair(it.id) },
-                            onUpdateRepairStatus = { itemId, status -> viewModel.updateRepairStatus(itemId, status) }
-                        )
+                        if (typeDetails == null) {
+                            SearchBar(searchQuery) { searchQuery = it }
+                            CategoryList(
+                                items = items,
+                                jobs = jobs, // ส่ง jobs เข้าไปด้วยเพื่อตรวจสอบวันที่
+                                searchQuery = searchQuery,
+                                onCategoryClick = { selectedTypeForDetails = it }
+                            )
+                        } else {
+                            val categoryItems = items.filter { it.type == typeDetails }
+                            InventoryList(
+                                items = if (searchQuery.isBlank()) categoryItems 
+                                        else categoryItems.filter { it.name.contains(searchQuery, ignoreCase = true) || it.serial.contains(searchQuery, ignoreCase = true) },
+                                jobs = jobs,
+                                onQRCodeClick = { selectedItemForQRCode = it },
+                                onCheckOut = { selectedItemForCheckOut = it },
+                                onCheckIn = { selectedItemForCheckIn = it },
+                                onSendToRepair = { selectedItemForRepair = it },
+                                onReturnFromRepair = { viewModel.returnFromRepair(it.id) },
+                                onUpdateRepairStatus = { itemId, status -> viewModel.updateRepairStatus(itemId, status) }
+                            )
+                        }
                     } else if (tab == 1 && jobDetails == null) {
                         JobList(
                             jobs = jobs,
@@ -166,23 +195,38 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                         )
                     } else if (jobDetails != null) {
                         // Show Job Details and Items
-                        JobDetailHeader(
-                            job = jobDetails,
-                            onEdit = { jobToEdit = jobDetails },
-                            onDelete = { jobToDelete = jobDetails }
-                        )
                         val jobItems = items.filter { it.currentJobId == jobDetails.id }
-                        InventoryList(
-                            items = jobItems,
-                            jobs = jobs,
-                            showJobLabel = false,
-                            onQRCodeClick = { selectedItemForQRCode = it },
-                            onCheckOut = { selectedItemForCheckOut = it },
-                            onCheckIn = { selectedItemForCheckIn = it },
-                            onSendToRepair = { selectedItemForRepair = it },
-                            onReturnFromRepair = { viewModel.returnFromRepair(it.id) },
-                            onUpdateRepairStatus = { itemId, status -> viewModel.updateRepairStatus(itemId, status) }
-                        )
+                        
+                        if (selectedTypeInJob == null) {
+                            JobDetailHeader(
+                                job = jobDetails,
+                                items = items,
+                                onEdit = { jobToEdit = jobDetails },
+                                onDelete = { jobToDelete = jobDetails }
+                            )
+                            SearchBar(searchQuery) { searchQuery = it }
+                            CategoryList(
+                                items = jobItems,
+                                jobs = jobs,
+                                searchQuery = searchQuery,
+                                onCategoryClick = { selectedTypeInJob = it },
+                                showAvailableText = false
+                            )
+                        } else {
+                            val filteredJobItems = jobItems.filter { it.type == selectedTypeInJob }
+                            InventoryList(
+                                items = if (searchQuery.isBlank()) filteredJobItems 
+                                        else filteredJobItems.filter { it.name.contains(searchQuery, ignoreCase = true) || it.serial.contains(searchQuery, ignoreCase = true) },
+                                jobs = jobs,
+                                showJobLabel = false,
+                                onQRCodeClick = { selectedItemForQRCode = it },
+                                onCheckOut = { selectedItemForCheckOut = it },
+                                onCheckIn = { selectedItemForCheckIn = it },
+                                onSendToRepair = { selectedItemForRepair = it },
+                                onReturnFromRepair = { viewModel.returnFromRepair(it.id) },
+                                onUpdateRepairStatus = { itemId, status -> viewModel.updateRepairStatus(itemId, status) }
+                            )
+                        }
                     }
                 }
             }
@@ -384,6 +428,8 @@ fun JobList(jobs: List<Job>, items: List<InventoryItem>, onJobClick: (Job) -> Un
         }
         items(jobs) { job ->
             val itemCount = items.count { it.currentJobId == job.id }
+            val jobItems = items.filter { it.currentJobId == job.id }
+            val totalPrice = jobItems.sumOf { it.dailyRate }
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -398,8 +444,114 @@ fun JobList(jobs: List<Job>, items: List<InventoryItem>, onJobClick: (Job) -> Un
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Column {
+                        val jobItems = items.filter { it.currentJobId == job.id }
+                        val totalPrice = jobItems.sumOf { it.dailyRate }
+                        
                         Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(if (itemCount > 0) "$itemCount items on this job" else job.date, style = MaterialTheme.typography.bodySmall, color = Secondary)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(job.date, style = MaterialTheme.typography.bodySmall, color = Secondary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("•", style = MaterialTheme.typography.bodySmall, color = Secondary)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "รายได้: ฿${String.format("%,.0f", totalPrice)}", 
+                                style = MaterialTheme.typography.bodySmall, 
+                                color = Success,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(if (itemCount > 0) "$itemCount items on this job" else "No items assigned", style = MaterialTheme.typography.bodySmall, color = Secondary)
+                    }
+                    Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Secondary)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CategoryList(
+    items: List<InventoryItem>,
+    jobs: List<Job>,
+    searchQuery: String,
+    onCategoryClick: (ItemType) -> Unit,
+    showAvailableText: Boolean = true
+) {
+    val today = remember { java.time.LocalDate.now().toString() }
+    val categories = ItemType.entries.filter { type ->
+        val count = items.count { it.type == type }
+        if (count == 0) return@filter false
+        
+        if (searchQuery.isBlank()) true
+        else type.displayName.contains(searchQuery, ignoreCase = true) || 
+             items.any { it.type == type && it.name.contains(searchQuery, ignoreCase = true) }
+    }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        if (categories.isEmpty()) {
+            item {
+                Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("No categories found", color = Secondary)
+                }
+            }
+        }
+        items(categories) { type ->
+            val totalCount = items.count { it.type == type }
+            // Logic: พร้อมใช้ = สถานะ AVAILABLE หรือ (สถานะ BUSY แต่ยังไม่ถึงวันงาน)
+            val availableCount = items.count { item ->
+                item.type == type && (
+                    item.status == ItemStatus.AVAILABLE || 
+                    (item.status == ItemStatus.BUSY && jobs.find { it.id == item.currentJobId }?.date?.let { it > today } == true)
+                )
+            }
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onCategoryClick(type) },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = Surface),
+                elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(20.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Background
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                val icon = when(type) {
+                                    ItemType.SPEAKER -> Icons.Default.Speaker
+                                    ItemType.MIC -> Icons.Default.Mic
+                                    ItemType.MIXER -> Icons.Default.SettingsInputComponent
+                                    ItemType.LIGHT -> Icons.Default.Lightbulb
+                                    ItemType.BACKLINE -> Icons.Default.MusicNote
+                                    ItemType.VISUAL -> Icons.Default.Tv
+                                    ItemType.RIGGING -> Icons.Default.Construction
+                                    ItemType.POWER -> Icons.Default.Power
+                                    else -> Icons.Default.Inventory
+                                }
+                                Icon(icon, contentDescription = null, tint = Primary)
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(type.displayName, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            val statusText = if (showAvailableText) {
+                                "พร้อมใช้ $availableCount จาก $totalCount"
+                            } else {
+                                "$totalCount รายการในงานนี้"
+                            }
+                            Text(statusText, style = MaterialTheme.typography.bodySmall, color = Secondary)
+                        }
                     }
                     Icon(Icons.Default.ChevronRight, contentDescription = null, tint = Secondary)
                 }
@@ -533,7 +685,7 @@ fun ModernItemCard(
                         Icon(Icons.Default.QrCode, contentDescription = "Show QR", modifier = Modifier.size(14.dp), tint = Secondary)
                     }
                 }
-                StatusDot(item.status)
+                StatusDot(item.status, item, jobs)
             }
 
             if (showJobLabel && item.currentJobId != null) {
@@ -556,23 +708,21 @@ fun ModernItemCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End, verticalAlignment = Alignment.CenterVertically) {
-                when (item.status) {
-                    ItemStatus.AVAILABLE -> {
-                        TextButton(
-                            onClick = { onSendToRepair(item) },
-                            modifier = Modifier.padding(end = 8.dp)
-                        ) {
-                            Text("Repair", color = Error)
-                        }
-                        Button(
-                            onClick = { onCheckOut(item) },
-                            shape = RoundedCornerShape(8.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = Primary)
-                        ) {
-                            Text("Check Out", style = MaterialTheme.typography.labelLarge)
-                        }
+                val today = remember { java.time.LocalDate.now().toString() }
+                val isFutureJob = item.currentJobId?.let { jobId ->
+                    jobs.find { it.id == jobId }?.date?.let { it > today }
+                } ?: false
+
+                if (item.status == ItemStatus.AVAILABLE || (item.status == ItemStatus.BUSY && isFutureJob)) {
+                    Button(
+                        onClick = { onCheckOut(item) },
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Primary)
+                    ) {
+                        Text("Check Out", style = MaterialTheme.typography.labelLarge)
                     }
-                    ItemStatus.BUSY -> {
+                    if (item.status == ItemStatus.BUSY) {
+                        Spacer(modifier = Modifier.width(8.dp))
                         OutlinedButton(
                             onClick = { onCheckIn(item) },
                             shape = RoundedCornerShape(8.dp),
@@ -581,31 +731,44 @@ fun ModernItemCard(
                             Text("Check In", color = Primary)
                         }
                     }
-                    ItemStatus.REPAIR_PENDING -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.status.displayName, color = Error, style = MaterialTheme.typography.labelMedium)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = { onUpdateRepairStatus(item.id, ItemStatus.REPAIRING) },
+                } else {
+                    when (item.status) {
+                        ItemStatus.BUSY -> {
+                            OutlinedButton(
+                                onClick = { onCheckIn(item) },
                                 shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Warning)
+                                border = ButtonDefaults.outlinedButtonBorder.copy(width = 1.dp)
                             ) {
-                                Text("เริ่มซ่อม", style = MaterialTheme.typography.labelLarge)
+                                Text("Check In", color = Primary)
                             }
                         }
-                    }
-                    ItemStatus.REPAIRING -> {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Text(item.status.displayName, color = Warning, style = MaterialTheme.typography.labelMedium)
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = { onReturnFromRepair(item) },
-                                shape = RoundedCornerShape(8.dp),
-                                colors = ButtonDefaults.buttonColors(containerColor = Success)
-                            ) {
-                                Text("พร้อมใช้", style = MaterialTheme.typography.labelLarge)
+                        ItemStatus.REPAIR_PENDING -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(item.status.displayName, color = Error, style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = { onUpdateRepairStatus(item.id, ItemStatus.REPAIRING) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Warning)
+                                ) {
+                                    Text("เริ่มซ่อม", style = MaterialTheme.typography.labelLarge)
+                                }
                             }
                         }
+                        ItemStatus.REPAIRING -> {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(item.status.displayName, color = Warning, style = MaterialTheme.typography.labelMedium)
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Button(
+                                    onClick = { onReturnFromRepair(item) },
+                                    shape = RoundedCornerShape(8.dp),
+                                    colors = ButtonDefaults.buttonColors(containerColor = Success)
+                                ) {
+                                    Text("พร้อมใช้", style = MaterialTheme.typography.labelLarge)
+                                }
+                            }
+                        }
+                        else -> {}
                     }
                 }
             }
@@ -614,7 +777,7 @@ fun ModernItemCard(
 }
 
 @Composable
-fun JobDetailHeader(job: Job, onEdit: () -> Unit, onDelete: () -> Unit) {
+fun JobDetailHeader(job: Job, items: List<InventoryItem>, onEdit: () -> Unit, onDelete: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -649,8 +812,16 @@ fun JobDetailHeader(job: Job, onEdit: () -> Unit, onDelete: () -> Unit) {
             
             DetailRow(Icons.Default.Person, "Customer: ${job.customer.ifBlank { "-" }}")
             DetailRow(Icons.Default.Place, "Location: ${job.location.ifBlank { "-" }}")
+            val jobItems = items.filter { it.currentJobId == job.id }
+            val totalPrice = jobItems.sumOf { it.dailyRate }
+
             DetailRow(Icons.Default.Event, "Date: ${job.date.ifBlank { "-" }}")
             DetailRow(Icons.Default.Schedule, "Team Time: ${job.teamTime.ifBlank { "-" }}")
+            DetailRow(
+                Icons.Default.Payments, 
+                "Actual Equipment Value: ฿${String.format("%,.2f", totalPrice)}",
+                color = Success
+            )
             
             if (job.notes.isNotBlank()) {
                 HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp), color = Background)
@@ -662,26 +833,36 @@ fun JobDetailHeader(job: Job, onEdit: () -> Unit, onDelete: () -> Unit) {
 }
 
 @Composable
-fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String) {
+fun DetailRow(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, color: Color = Color.Unspecified) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = Secondary)
+        Icon(icon, contentDescription = null, modifier = Modifier.size(16.dp), tint = if (color != Color.Unspecified) color else Secondary)
         Spacer(modifier = Modifier.width(8.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium)
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = if (color != Color.Unspecified) color else Color.Unspecified)
     }
 }
 
 @Composable
-fun StatusDot(status: ItemStatus) {
-    val color = when(status) {
-        ItemStatus.AVAILABLE -> Success
-        ItemStatus.REPAIR_PENDING -> Error
-        ItemStatus.REPAIRING -> Warning
-        ItemStatus.BUSY -> Warning
+fun StatusDot(status: ItemStatus, item: InventoryItem? = null, jobs: List<Job> = emptyList()) {
+    val today = remember { java.time.LocalDate.now().toString() }
+    val isFutureJob = item?.currentJobId?.let { jobId ->
+        jobs.find { it.id == jobId }?.date?.let { it > today }
+    } ?: false
+
+    val color = when {
+        status == ItemStatus.AVAILABLE -> Success
+        status == ItemStatus.BUSY && isFutureJob -> Primary // สีฟ้า/น้ำเงิน บอกว่าจองแล้วแต่ยังว่างอยู่
+        status == ItemStatus.BUSY -> Warning // สีเหลือง คือติดงานวันนี้หรือที่ผ่านมาแล้ว
+        status == ItemStatus.REPAIR_PENDING -> Error
+        status == ItemStatus.REPAIRING -> Warning
+        else -> Secondary
     }
+    
+    val displayText = if (status == ItemStatus.BUSY && isFutureJob) "จองแล้ว (ว่าง)" else status.displayName
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
         Spacer(modifier = Modifier.width(6.dp))
-        Text(status.displayName, style = MaterialTheme.typography.labelSmall, color = Secondary)
+        Text(displayText, style = MaterialTheme.typography.labelSmall, color = Secondary)
     }
 }
 
