@@ -1,49 +1,62 @@
 package com.example.projectinventory.data
 
+import android.app.AlarmManager
 import android.app.Application
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import com.example.projectinventory.util.ReminderReceiver
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class InventoryViewModel(application: Application) : AndroidViewModel(application) {
     private val db = InventoryDatabase.getDatabase(application)
     private val dao = db.inventoryDao()
 
-    private val _items = MutableStateFlow<List<InventoryItem>>(emptyList())
-    val items: StateFlow<List<InventoryItem>> = _items.asStateFlow()
-
-    private val _jobs = MutableStateFlow<List<Job>>(emptyList())
-    val jobs: StateFlow<List<Job>> = _jobs.asStateFlow()
-
-    init {
-        loadItems()
-        loadJobs()
-    }
-
-    private fun loadItems() {
-        viewModelScope.launch {
-            dao.getAllItems().collect { entities ->
-                if (entities.isEmpty()) {
+    val items: StateFlow<List<InventoryItem>> = dao.getAllItems()
+        .map { entities ->
+            if (entities.isEmpty() && !isSeeding) {
+                isSeeding = true
+                viewModelScope.launch(Dispatchers.IO) {
                     seedInitialData()
-                } else {
-                    _items.value = entities.map { it.toDomain() }
+                    isSeeding = false
                 }
             }
+            entities.map { it.toDomain() }
         }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    val jobs: StateFlow<List<Job>> = dao.getAllJobs()
+        .map { entities -> entities.map { it.toDomain() } }
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5000),
+            initialValue = emptyList()
+        )
+
+    private var isSeeding = false
+
+    init {
+        // Initialization handled by stateIn
     }
 
-    private fun loadJobs() {
-        viewModelScope.launch {
-            dao.getAllJobs().collect { entities ->
-                _jobs.value = entities.map { it.toDomain() }
-            }
-        }
-    }
+    private fun loadItems() { /* Removed - using stateIn */ }
+    private fun loadJobs() { /* Removed - using stateIn */ }
 
-    private suspend fun seedInitialData() {
+    private suspend fun seedInitialData() = withContext(Dispatchers.Default) {
         val itemsToSeed = mutableListOf<InventoryItem>()
 
         // --- AUDIO SYSTEM (40 Million THB) ---
@@ -119,8 +132,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
         dao.insertJobs(initialJobs.map { it.toEntity() })
 
-        // Auto-assign items for initial jobs
-        val allItems = dao.getAllItemsList().map { it.toDomain() }.toMutableList()
+        val allItems = itemsToSeed.toMutableList()
         val itemsToUpdate = mutableListOf<InventoryItem>()
 
         initialJobs.forEach { job ->
@@ -162,8 +174,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         }
     }
 
-    fun addItem(name: String, type: ItemType) {
-        val newItem = InventoryItem(name = name, type = type)
+    fun addItem(name: String, type: ItemType, dailyRate: Double) {
+        val newItem = InventoryItem(name = name, type = type, dailyRate = dailyRate)
         viewModelScope.launch {
             dao.insertItem(newItem.toEntity())
         }
@@ -179,7 +191,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         notes: String,
         reminderEnabled: Boolean
     ) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
             val newJob = Job(
                 name = name,
                 customer = customer,
@@ -192,7 +204,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             )
             dao.insertJob(newJob.toEntity())
 
-            // --- AUTO-ASSIGN LOGIC ---
+            if (reminderEnabled) {
+                scheduleReminder(newJob)
+            }
+
             val requiredTypes = when (preset) {
                 JobPreset.TALK -> listOf(
                     ItemType.MIC to 2, 
@@ -233,7 +248,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
 
-            val allItems = dao.getAllItemsList().map { it.toDomain() }.toMutableList()
+            val allEntities = dao.getAllItemsList()
+            val allItems = allEntities.map { it.toDomain() }.toMutableList()
             val itemsToUpdate = mutableListOf<InventoryItem>()
             
             requiredTypes.forEach { (type, count) ->
@@ -258,11 +274,68 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     fun updateJob(job: Job) {
         viewModelScope.launch {
             dao.insertJob(job.toEntity())
+            if (job.reminderEnabled) {
+                scheduleReminder(job)
+            } else {
+                cancelReminder(job)
+            }
         }
+    }
+
+    private fun scheduleReminder(job: Job) {
+        val alarmManager = getApplication<Application>().getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(getApplication(), ReminderReceiver::class.java).apply {
+            putExtra("JOB_NAME", job.name)
+            putExtra("JOB_LOCATION", job.location)
+            putExtra("JOB_ID", job.id)
+        }
+        
+        val pendingIntent = PendingIntent.getBroadcast(
+            getApplication(),
+            job.id.hashCode(),
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        try {
+            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+            val dateStr = "${job.date} ${if(job.teamTime.contains(":")) job.teamTime else "08:00"}"
+            val date = sdf.parse(dateStr)
+            
+            date?.let {
+                val calendar = Calendar.getInstance()
+                calendar.time = it
+                // FOR TESTING: Notify immediately (at Team Time)
+                // calendar.add(Calendar.HOUR_OF_DAY, -1)
+                
+                if (calendar.timeInMillis > System.currentTimeMillis()) {
+                    alarmManager.setExactAndAllowWhileIdle(
+                        AlarmManager.RTC_WAKEUP,
+                        calendar.timeInMillis,
+                        pendingIntent
+                    )
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun cancelReminder(job: Job) {
+        val alarmManager = getApplication<Application>().getSystemService(Context.ALARM_SERVICE) as AlarmManager
+        val intent = Intent(getApplication(), ReminderReceiver::class.java)
+        val pendingIntent = PendingIntent.getBroadcast(
+            getApplication(),
+            job.id.hashCode(),
+            intent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_NO_CREATE
+        )
+        pendingIntent?.let { alarmManager.cancel(it) }
     }
 
     fun deleteJob(job: Job) {
         viewModelScope.launch {
+            cancelReminder(job)
             val jobItems = dao.getAllItemsList().filter { it.currentJobId == job.id }
             val updatedItems = jobItems.map { 
                 it.copy(status = ItemStatus.AVAILABLE.name, currentJobId = null) 
@@ -276,39 +349,26 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun checkOut(itemId: String, jobId: String) {
         viewModelScope.launch {
-            val items = dao.getAllItemsList()
-            val entity = items.find { it.id == itemId }
-            entity?.let {
-                dao.updateItem(it.copy(status = ItemStatus.BUSY.name, currentJobId = jobId))
-            }
+            dao.updateItemStatus(itemId, ItemStatus.BUSY.name, jobId)
         }
     }
 
     fun checkIn(itemId: String, isDamaged: Boolean = false) {
         viewModelScope.launch {
-            val items = dao.getAllItemsList()
-            val entity = items.find { it.id == itemId }
-            entity?.let {
-                val nextStatus = if (isDamaged) ItemStatus.REPAIR_PENDING else ItemStatus.AVAILABLE
-                dao.updateItem(it.copy(status = nextStatus.name, currentJobId = null))
-            }
+            val nextStatus = if (isDamaged) ItemStatus.REPAIR_PENDING else ItemStatus.AVAILABLE
+            dao.updateItemStatus(itemId, nextStatus.name, null)
         }
     }
 
     fun sendToRepair(itemId: String) {
         viewModelScope.launch {
-            val items = dao.getAllItemsList()
-            val entity = items.find { it.id == itemId }
-            entity?.let {
-                dao.updateItem(it.copy(status = ItemStatus.REPAIR_PENDING.name, currentJobId = null))
-            }
+            dao.updateItemStatus(itemId, ItemStatus.REPAIR_PENDING.name, null)
         }
     }
 
     fun updateRepairStatus(itemId: String, status: ItemStatus) {
         viewModelScope.launch {
-            val items = dao.getAllItemsList()
-            val entity = items.find { it.id == itemId }
+            val entity = dao.getItemById(itemId)
             entity?.let {
                 dao.updateItem(it.copy(status = status.name))
             }
@@ -317,15 +377,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun returnFromRepair(itemId: String) {
         viewModelScope.launch {
-            val items = dao.getAllItemsList()
-            val entity = items.find { it.id == itemId }
-            entity?.let {
-                dao.updateItem(it.copy(status = ItemStatus.AVAILABLE.name, currentJobId = null))
-            }
+            dao.updateItemStatus(itemId, ItemStatus.AVAILABLE.name, null)
         }
     }
 
-    fun getJobById(id: String) = _jobs.value.find { it.id == id }
+    fun getJobById(id: String) = jobs.value.find { it.id == id }
 
     // Mappers
     private fun InventoryItemEntity.toDomain() = InventoryItem(

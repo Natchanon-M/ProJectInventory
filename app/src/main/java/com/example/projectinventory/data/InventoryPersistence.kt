@@ -12,6 +12,15 @@ interface InventoryDao {
     @Query("SELECT * FROM inventory_items")
     suspend fun getAllItemsList(): List<InventoryItemEntity>
 
+    @Query("SELECT * FROM inventory_items WHERE id = :id")
+    suspend fun getItemById(id: String): InventoryItemEntity?
+
+    @Query("SELECT * FROM inventory_items WHERE type = :type AND status = 'AVAILABLE' LIMIT :limit")
+    suspend fun getAvailableItemsByType(type: String, limit: Int): List<InventoryItemEntity>
+
+    @Query("UPDATE inventory_items SET status = :status, currentJobId = :jobId WHERE id = :itemId")
+    suspend fun updateItemStatus(itemId: String, status: String, jobId: String?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertItem(item: InventoryItemEntity)
 
@@ -24,10 +33,19 @@ interface InventoryDao {
     @Update
     suspend fun updateItems(items: List<InventoryItemEntity>)
 
+    @Transaction
+    suspend fun assignItemsToJob(jobId: String, requirements: List<Pair<String, Int>>) {
+        requirements.forEach { (type, count) ->
+            val available = getAvailableItemsByType(type, count)
+            val updated = available.map { it.copy(status = "BUSY", currentJobId = jobId) }
+            updateItems(updated)
+        }
+    }
+
     @Query("DELETE FROM inventory_items")
     suspend fun deleteAll()
 
-    @Query("SELECT * FROM jobs")
+    @Query("SELECT * FROM jobs ORDER BY date ASC")
     fun getAllJobs(): Flow<List<JobEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -40,7 +58,14 @@ interface InventoryDao {
     suspend fun deleteJob(job: JobEntity)
 }
 
-@Entity(tableName = "inventory_items")
+@Entity(
+    tableName = "inventory_items",
+    indices = [
+        Index(value = ["status"]),
+        Index(value = ["type"]),
+        Index(value = ["currentJobId"])
+    ]
+)
 data class InventoryItemEntity(
     @PrimaryKey val id: String,
     val name: String,
@@ -52,7 +77,10 @@ data class InventoryItemEntity(
     val dailyRate: Double = 0.0
 )
 
-@Entity(tableName = "jobs")
+@Entity(
+    tableName = "jobs",
+    indices = [Index(value = ["date"])]
+)
 data class JobEntity(
     @PrimaryKey val id: String,
     val name: String,

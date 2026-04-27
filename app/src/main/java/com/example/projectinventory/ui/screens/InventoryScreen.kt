@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -36,6 +37,10 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
     val jobs by viewModel.jobs.collectAsState()
     var searchQuery by remember { mutableStateOf("") }
     
+    // Optimization: Pre-calculate counts and filtered lists using derivedStateOf
+    val busyItemsCount by remember { derivedStateOf { items.count { it.status == ItemStatus.BUSY } } }
+    val repairItemsCount by remember { derivedStateOf { items.count { it.status == ItemStatus.REPAIR_PENDING || it.status == ItemStatus.REPAIRING } } }
+
     var selectedItemForCheckOut by remember { mutableStateOf<InventoryItem?>(null) }
     var selectedItemForCheckIn by remember { mutableStateOf<InventoryItem?>(null) }
     var selectedItemForRepair by remember { mutableStateOf<InventoryItem?>(null) }
@@ -50,6 +55,14 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
     var selectedJobForDetails by remember { mutableStateOf<Job?>(null) }
     var selectedTypeForDetails by remember { mutableStateOf<ItemType?>(null) }
     var selectedTypeInJob by remember { mutableStateOf<ItemType?>(null) }
+
+    // Optimization: Filtered items based on search
+    val filteredItems by remember {
+        derivedStateOf {
+            if (searchQuery.isBlank()) items
+            else items.filter { it.name.contains(searchQuery, ignoreCase = true) || it.serial.contains(searchQuery, ignoreCase = true) }
+        }
+    }
 
 
     Scaffold(
@@ -110,14 +123,14 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                         TabItem(
                             title = "On Job", 
                             isSelected = selectedTab == 1, 
-                            badgeCount = items.count { it.status == ItemStatus.BUSY },
+                            badgeCount = busyItemsCount,
                             modifier = Modifier.weight(1f),
                             onClick = { selectedTab = 1 }
                         )
                         TabItem(
                             title = "Repair", 
                             isSelected = selectedTab == 2, 
-                            badgeCount = items.count { it.status == ItemStatus.REPAIR_PENDING || it.status == ItemStatus.REPAIRING },
+                            badgeCount = repairItemsCount,
                             modifier = Modifier.weight(1f),
                             onClick = { selectedTab = 2 }
                         )
@@ -158,15 +171,16 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                             SearchBar(searchQuery) { searchQuery = it }
                             CategoryList(
                                 items = items,
-                                jobs = jobs, // ส่ง jobs เข้าไปด้วยเพื่อตรวจสอบวันที่
+                                jobs = jobs,
                                 searchQuery = searchQuery,
                                 onCategoryClick = { selectedTypeForDetails = it }
                             )
                         } else {
-                            val categoryItems = items.filter { it.type == typeDetails }
+                            val categoryItems by remember(filteredItems, typeDetails) {
+                                derivedStateOf { filteredItems.filter { it.type == typeDetails } }
+                            }
                             InventoryList(
-                                items = if (searchQuery.isBlank()) categoryItems 
-                                        else categoryItems.filter { it.name.contains(searchQuery, ignoreCase = true) || it.serial.contains(searchQuery, ignoreCase = true) },
+                                items = categoryItems,
                                 jobs = jobs,
                                 onQRCodeClick = { selectedItemForQRCode = it },
                                 onCheckOut = { selectedItemForCheckOut = it },
@@ -183,8 +197,11 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                             onJobClick = { selectedJobForDetails = it }
                         )
                     } else if (tab == 2 && jobDetails == null) {
+                        val repairItems by remember(items) {
+                            derivedStateOf { items.filter { it.status == ItemStatus.REPAIR_PENDING || it.status == ItemStatus.REPAIRING } }
+                        }
                         InventoryList(
-                            items = items.filter { it.status == ItemStatus.REPAIR_PENDING || it.status == ItemStatus.REPAIRING },
+                            items = repairItems,
                             jobs = jobs,
                             onQRCodeClick = { selectedItemForQRCode = it },
                             onCheckOut = { selectedItemForCheckOut = it },
@@ -213,10 +230,22 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
                                 showAvailableText = false
                             )
                         } else {
-                            val filteredJobItems = jobItems.filter { it.type == selectedTypeInJob }
+                            val filteredJobItems by remember(jobItems, searchQuery) {
+                                derivedStateOf {
+                                    if (searchQuery.isBlank()) jobItems
+                                    else jobItems.filter {
+                                        it.name.contains(searchQuery, ignoreCase = true) ||
+                                                it.serial.contains(searchQuery, ignoreCase = true)
+                                    }
+                                }
+                            }
+                            val categorizedJobItems by remember(filteredJobItems, selectedTypeInJob) {
+                                derivedStateOf {
+                                    filteredJobItems.filter { it.type == selectedTypeInJob }
+                                }
+                            }
                             InventoryList(
-                                items = if (searchQuery.isBlank()) filteredJobItems 
-                                        else filteredJobItems.filter { it.name.contains(searchQuery, ignoreCase = true) || it.serial.contains(searchQuery, ignoreCase = true) },
+                                items = categorizedJobItems,
                                 jobs = jobs,
                                 showJobLabel = false,
                                 onQRCodeClick = { selectedItemForQRCode = it },
@@ -236,8 +265,8 @@ fun InventoryScreen(viewModel: InventoryViewModel) {
         if (showAddItemDialog) {
             AddItemDialog(
                 onDismiss = { showAddItemDialog = false },
-                onConfirm = { name, type ->
-                    viewModel.addItem(name, type)
+                onConfirm = { name, type, rate ->
+                    viewModel.addItem(name, type, rate)
                     showAddItemDialog = false
                 }
             )
@@ -426,10 +455,10 @@ fun JobList(jobs: List<Job>, items: List<InventoryItem>, onJobClick: (Job) -> Un
                 }
             }
         }
-        items(jobs) { job ->
-            val itemCount = items.count { it.currentJobId == job.id }
-            val jobItems = items.filter { it.currentJobId == job.id }
-            val totalPrice = jobItems.sumOf { it.dailyRate }
+        items(jobs, key = { it.id }) { job ->
+            val jobItems = remember(items, job.id) { items.filter { it.currentJobId == job.id } }
+            val itemCount = jobItems.size
+            val totalPrice = remember(jobItems) { jobItems.sumOf { it.dailyRate } }
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -443,11 +472,8 @@ fun JobList(jobs: List<Job>, items: List<InventoryItem>, onJobClick: (Job) -> Un
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Column {
-                        val jobItems = items.filter { it.currentJobId == job.id }
-                        val totalPrice = jobItems.sumOf { it.dailyRate }
-                        
-                        Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Column {
+                            Text(job.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(job.date, style = MaterialTheme.typography.bodySmall, color = Secondary)
                             Spacer(modifier = Modifier.width(8.dp))
@@ -499,14 +525,16 @@ fun CategoryList(
                 }
             }
         }
-        items(categories) { type ->
-            val totalCount = items.count { it.type == type }
+        items(categories, key = { it.name }) { type ->
             // Logic: พร้อมใช้ = สถานะ AVAILABLE หรือ (สถานะ BUSY แต่ยังไม่ถึงวันงาน)
-            val availableCount = items.count { item ->
-                item.type == type && (
-                    item.status == ItemStatus.AVAILABLE || 
-                    (item.status == ItemStatus.BUSY && jobs.find { it.id == item.currentJobId }?.date?.let { it > today } == true)
-                )
+            val totalCount = remember(items, type) { items.count { it.type == type } }
+            val availableCount = remember(items, type, jobs, today) {
+                items.count { item ->
+                    item.type == type && (
+                        item.status == ItemStatus.AVAILABLE || 
+                        (item.status == ItemStatus.BUSY && jobs.find { it.id == item.currentJobId }?.date?.let { it > today } == true)
+                    )
+                }
             }
             Card(
                 modifier = Modifier
@@ -584,7 +612,7 @@ fun InventoryList(
                 }
             }
         }
-        items(items) { item ->
+        items(items, key = { it.id }) { item ->
             ModernItemCard(
                 item = item,
                 jobs = jobs,
@@ -867,6 +895,7 @@ fun StatusDot(status: ItemStatus, item: InventoryItem? = null, jobs: List<Job> =
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddJobDialog(
     initialJob: Job? = null,
@@ -882,6 +911,43 @@ fun AddJobDialog(
     var notes by remember { mutableStateOf(initialJob?.notes ?: "") }
     var reminderEnabled by remember { mutableStateOf(initialJob?.reminderEnabled ?: false) }
     var expandedPreset by remember { mutableStateOf(false) }
+    
+    // State สำหรับ Date Picker
+    var showDatePicker by remember { mutableStateOf(false) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialJob?.date?.let {
+            try {
+                java.time.LocalDate.parse(it)
+                    .atStartOfDay(java.time.ZoneOffset.UTC)
+                    .toInstant()
+                    .toEpochMilli()
+            } catch (e: Exception) {
+                System.currentTimeMillis()
+            }
+        } ?: System.currentTimeMillis()
+    )
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val selectedDate = java.time.Instant.ofEpochMilli(millis)
+                            .atZone(java.time.ZoneOffset.UTC)
+                            .toLocalDate()
+                        date = selectedDate.toString()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) { Text("Cancel") }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -933,19 +999,32 @@ fun AddJobDialog(
                 }
                 item {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = date,
-                            onValueChange = { date = it },
-                            label = { Text("Date (YYYY-MM-DD)") },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp)
-                        )
+                        // ช่องวันที่แบบจิ้ม (Box ทับ TextField)
+                        Box(modifier = Modifier.weight(1f)) {
+                            OutlinedTextField(
+                                value = date,
+                                onValueChange = { },
+                                label = { Text("Date (YYYY-MM-DD)") },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(8.dp),
+                                readOnly = true,
+                                trailingIcon = { Icon(Icons.Default.DateRange, contentDescription = null) }
+                            )
+                            // สร้างพื้นที่ใสๆ ทับไว้เพื่อรับการคลิก
+                            Box(
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .clickable { showDatePicker = true }
+                            )
+                        }
+                        
                         OutlinedTextField(
                             value = teamTime,
                             onValueChange = { teamTime = it },
                             label = { Text("Team Time") },
                             modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(8.dp)
+                            shape = RoundedCornerShape(8.dp),
+                            trailingIcon = { Icon(Icons.Default.AccessTime, contentDescription = null) }
                         )
                     }
                 }
@@ -985,15 +1064,26 @@ fun AddJobDialog(
 }
 
 @Composable
-fun AddItemDialog(onDismiss: () -> Unit, onConfirm: (String, ItemType) -> Unit) {
+fun AddItemDialog(onDismiss: () -> Unit, onConfirm: (String, ItemType, Double) -> Unit) {
     var name by remember { mutableStateOf("") }
     var selectedType by remember { mutableStateOf(ItemType.SPEAKER) }
+    var dailyRateStr by remember { mutableStateOf(getDefaultRate(selectedType).toString()) }
     var expanded by remember { mutableStateOf(false) }
+
+    val isValidRate = dailyRateStr.toDoubleOrNull() != null && (dailyRateStr.toDoubleOrNull() ?: -1.0) >= 0
 
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            Button(onClick = { if(name.isNotBlank()) onConfirm(name, selectedType) }, shape = RoundedCornerShape(8.dp)) {
+            Button(
+                onClick = { 
+                    if(name.isNotBlank() && isValidRate) {
+                        onConfirm(name, selectedType, dailyRateStr.toDoubleOrNull() ?: 0.0)
+                    }
+                }, 
+                shape = RoundedCornerShape(8.dp),
+                enabled = name.isNotBlank() && isValidRate
+            ) {
                 Text("Save Item")
             }
         },
@@ -1016,10 +1106,30 @@ fun AddItemDialog(onDismiss: () -> Unit, onConfirm: (String, ItemType) -> Unit) 
                     }
                     DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
                         ItemType.entries.forEach { type ->
-                            DropdownMenuItem(text = { Text(type.displayName) }, onClick = { selectedType = type; expanded = false })
+                            DropdownMenuItem(
+                                text = { Text(type.displayName) }, 
+                                onClick = { 
+                                    selectedType = type
+                                    dailyRateStr = getDefaultRate(type).toString()
+                                    expanded = false 
+                                }
+                            )
                         }
                     }
                 }
+                OutlinedTextField(
+                    value = dailyRateStr,
+                    onValueChange = { dailyRateStr = it },
+                    label = { Text("Daily Rate (฿)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(8.dp),
+                    isError = !isValidRate,
+                    supportingText = {
+                        if (!isValidRate) {
+                            Text("Please enter a valid price", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                )
             }
         },
         shape = RoundedCornerShape(24.dp),

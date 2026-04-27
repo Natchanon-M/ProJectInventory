@@ -1,17 +1,19 @@
 [versions]
-agp = "9.1.1"
-coreKtx = "1.18.0"
+agp = "8.13.2"
+coreKtx = "1.13.1"
 junit = "4.13.2"
-junitVersion = "1.3.0"
-espressoCore = "3.7.0"
-lifecycleRuntimeKtx = "2.10.0"
-activityCompose = "1.13.0"
-kotlin = "2.1.0"
-composeBom = "2026.02.01"
-room = "2.7.0-alpha11"
-ksp = "2.1.0-1.0.29"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+lifecycleRuntimeKtx = "2.8.7"
+activityCompose = "1.9.3"
+kotlin = "2.0.21"
+composeBom = "2024.10.01"
+room = "2.6.1"
+ksp = "2.0.21-1.0.27"
 zxing = "3.5.4"
 androidx-print = "1.0.0"
+glance = "1.1.0"
+coreKtxVersion = "1.15.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -36,10 +38,12 @@ androidx-room-compiler = { group = "androidx.room", name = "room-compiler", vers
 google-ksp-api = { group = "com.google.devtools.ksp", name = "symbol-processing-api", version.ref = "ksp" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 androidx-print = { group = "androidx.print", name = "print", version.ref = "androidx-print" }
+androidx-glance-appwidget = { group = "androidx.glance", name = "glance-appwidget", version.ref = "glance" }
+androidx-glance-material3 = { group = "androidx.glance", name = "glance-material3", version.ref = "glance" }
+core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtxVersion" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 google-ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-
