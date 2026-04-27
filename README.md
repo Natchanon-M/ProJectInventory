@@ -30,10 +30,25 @@
 
 ## 📂 โครงสร้างโปรเจ็ค (Project Structure)
 
-- `data/`: เก็บ Model (InventoryItem, Job), Enums และ Room Database Configuration
-- `ui/screens/`: โค้ดส่วนหน้าจอหลัก (`InventoryScreen.kt`) และ UI Logic
-- `ui/theme/`: การกำหนดสี, Font และสไตล์ของแอป (Material 3)
-- `util/`: คลาสช่วยเหลือต่างๆ เช่น `QRCodeGenerator` และ `ImageSaver`
+### 📁 `app/src/main/java/com/example/projectinventory/`
+- **`MainActivity.kt`**: จุดเริ่มต้นของแอปพลิเคชัน จัดการ Compose UI, Permissions และเป็นโฮสต์สำหรับหน้าจอหลัก
+
+#### 📁 `data/` (การจัดการข้อมูล)
+- **`InventoryItem.kt`**: นิยาม Model ข้อมูล (InventoryItem, Job) และสถานะต่างๆ (ItemStatus, ItemType, JobPreset)
+- **`InventoryPersistence.kt`**: จัดการฐานข้อมูล Room ประกอบด้วย Database Configuration, DAO และ Entities
+- **`InventoryViewModel.kt`**: หัวใจหลักของ Business Logic เชื่อมต่อข้อมูลจาก DB มายัง UI และคำนวณรายได้/สถานะอุปกรณ์
+
+#### 📁 `ui/` (ส่วนแสดงผล)
+- **`screens/InventoryScreen.kt`**: ไฟล์ UI หลักที่รวมหน้าจอสต็อก, รายการงาน, และระบบซ่อมบำรุงเข้าด้วยกัน
+- **`theme/`**: กำหนดค่าสี (`Color.kt`), รูปแบบตัวอักษร (`Type.kt`) และธีมหลักของแอป (`Theme.kt`)
+
+#### 📁 `util/` (เครื่องมือช่วยเหลือ)
+- **`QRCodeGenerator.kt`**: เครื่องมือสร้าง QR Code จาก Serial Number ของอุปกรณ์
+- **`ImageSaver.kt`**: จัดการการบันทึกรูปภาพลง Gallery และระบบการพิมพ์ QR Code (Print)
+- **`ReminderReceiver.kt`**: ตัวจัดการการแจ้งเตือน (Notifications) ตามเวลาที่นัดหมายในงาน
+
+#### 📁 `widget/` (ส่วนเสริมหน้าจอ Home)
+- **`InventoryWidget.kt`**: จัดการระบบ App Widget เพื่อดูสรุปสถานะอุปกรณ์และงานจากหน้าจอหลัก
 
 ## 🚀 เริ่มต้นใช้งาน
 
