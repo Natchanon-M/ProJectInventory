@@ -50,7 +50,10 @@ data class InventoryItem(
     val serial: String = generateSerial(type),
     val imageUrl: String? = null,
     val currentJobId: String? = null,
-    val dailyRate: Double = getDefaultRate(type)
+    val dailyRate: Double = getDefaultRate(type),
+    val repairNote: String? = null,
+    val repairStartDate: String? = null,
+    val repairProgress: Int = 0 // 0-100
 )
 
 fun getDefaultRate(type: ItemType): Double {

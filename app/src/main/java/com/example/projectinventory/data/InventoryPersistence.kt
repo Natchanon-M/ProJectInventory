@@ -74,7 +74,10 @@ data class InventoryItemEntity(
     val serial: String,
     val currentJobId: String?,
     val imageUrl: String?,
-    val dailyRate: Double = 0.0
+    val dailyRate: Double = 0.0,
+    val repairNote: String? = null,
+    val repairStartDate: String? = null,
+    val repairProgress: Int = 0
 )
 
 @Entity(
@@ -93,7 +96,7 @@ data class JobEntity(
     val reminderEnabled: Boolean
 )
 
-@Database(entities = [InventoryItemEntity::class, JobEntity::class], version = 11)
+@Database(entities = [InventoryItemEntity::class, JobEntity::class], version = 12)
 abstract class InventoryDatabase : RoomDatabase() {
     abstract fun inventoryDao(): InventoryDao
 

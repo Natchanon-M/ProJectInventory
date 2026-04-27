@@ -354,31 +354,76 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun checkIn(itemId: String, isDamaged: Boolean = false) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.Default) {
+            val item = dao.getItemById(itemId)?.toDomain() ?: return@launch
+            val currentJobId = item.currentJobId
+            
             val nextStatus = if (isDamaged) ItemStatus.REPAIR_PENDING else ItemStatus.AVAILABLE
             dao.updateItemStatus(itemId, nextStatus.name, null)
+
+            // If item was damaged and was part of a job, try to find a replacement
+            if (isDamaged && currentJobId != null) {
+                val availableReplacement = dao.getAllItemsList()
+                    .map { it.toDomain() }
+                    .find { it.type == item.type && it.status == ItemStatus.AVAILABLE }
+                
+                availableReplacement?.let { replacement ->
+                    dao.updateItemStatus(replacement.id, ItemStatus.BUSY.name, currentJobId)
+                }
+            }
         }
     }
 
-    fun sendToRepair(itemId: String) {
+    fun sendToRepair(itemId: String, note: String = "") {
         viewModelScope.launch {
-            dao.updateItemStatus(itemId, ItemStatus.REPAIR_PENDING.name, null)
+            val date = java.time.LocalDate.now().toString()
+            val entity = dao.getItemById(itemId)
+            entity?.let {
+                dao.updateItem(it.copy(
+                    status = ItemStatus.REPAIR_PENDING.name,
+                    currentJobId = null,
+                    repairNote = note,
+                    repairStartDate = date,
+                    repairProgress = 0
+                ))
+            }
         }
     }
 
-    fun updateRepairStatus(itemId: String, status: ItemStatus) {
+    fun startRepair(itemId: String) {
         viewModelScope.launch {
             val entity = dao.getItemById(itemId)
             entity?.let {
-                dao.updateItem(it.copy(status = status.name))
+                dao.updateItem(it.copy(status = ItemStatus.REPAIRING.name))
+            }
+        }
+    }
+
+    fun updateRepairProgress(itemId: String, progress: Int) {
+        viewModelScope.launch {
+            val entity = dao.getItemById(itemId)
+            entity?.let {
+                dao.updateItem(it.copy(repairProgress = progress))
+            }
+        }
+    }
+
+    fun completeRepair(itemId: String) {
+        viewModelScope.launch {
+            dao.updateItemStatus(itemId, ItemStatus.AVAILABLE.name, null)
+            val entity = dao.getItemById(itemId)
+            entity?.let {
+                dao.updateItem(it.copy(
+                    repairNote = null,
+                    repairStartDate = null,
+                    repairProgress = 0
+                ))
             }
         }
     }
 
     fun returnFromRepair(itemId: String) {
-        viewModelScope.launch {
-            dao.updateItemStatus(itemId, ItemStatus.AVAILABLE.name, null)
-        }
+        completeRepair(itemId)
     }
 
     fun getJobById(id: String) = jobs.value.find { it.id == id }
@@ -399,7 +444,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         serial = serial,
         currentJobId = currentJobId,
         imageUrl = imageUrl,
-        dailyRate = dailyRate
+        dailyRate = dailyRate,
+        repairNote = repairNote,
+        repairStartDate = repairStartDate,
+        repairProgress = repairProgress
     )
 
     private fun InventoryItem.toEntity() = InventoryItemEntity(
@@ -410,7 +458,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         serial = serial,
         currentJobId = currentJobId,
         imageUrl = imageUrl,
-        dailyRate = dailyRate
+        dailyRate = dailyRate,
+        repairNote = repairNote,
+        repairStartDate = repairStartDate,
+        repairProgress = repairProgress
     )
 
     private fun JobEntity.toDomain() = Job(
