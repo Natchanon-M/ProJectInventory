@@ -1513,7 +1513,12 @@ fun AddItemDialog(onDismiss: () -> Unit, onConfirm: (String, ItemType, Double) -
 
 @Composable
 fun CheckOutDialog(item: InventoryItem, jobs: List<Job>, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-    var selectedJobId by remember { mutableStateOf(jobs.firstOrNull()?.id ?: "") }
+    val today = remember { java.time.LocalDate.now().toString() }
+    val filteredJobs = remember(jobs) {
+        jobs.filter { it.date >= today }
+    }
+    var selectedJobId by remember { mutableStateOf(filteredJobs.firstOrNull()?.id ?: "") }
+    
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Check Out: ${item.name}", fontWeight = FontWeight.Bold) },
@@ -1521,18 +1526,28 @@ fun CheckOutDialog(item: InventoryItem, jobs: List<Job>, onDismiss: () -> Unit, 
             Column {
                 Text("Select destination job:", style = MaterialTheme.typography.bodyMedium, color = Secondary)
                 Spacer(modifier = Modifier.height(12.dp))
-                jobs.forEach { job ->
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().clickable { selectedJobId = job.id }.padding(vertical = 4.dp)
-                    ) {
-                        RadioButton(selected = (selectedJobId == job.id), onClick = { selectedJobId = job.id })
-                        Text(job.name, modifier = Modifier.padding(start = 8.dp))
+                if (filteredJobs.isEmpty()) {
+                    Text("No upcoming jobs found.", color = Error, style = MaterialTheme.typography.bodySmall)
+                } else {
+                    filteredJobs.forEach { job ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable { selectedJobId = job.id }.padding(vertical = 4.dp)
+                        ) {
+                            RadioButton(selected = (selectedJobId == job.id), onClick = { selectedJobId = job.id })
+                            Text(job.name, modifier = Modifier.padding(start = 8.dp))
+                        }
                     }
                 }
             }
         },
-        confirmButton = { Button(onClick = { onConfirm(selectedJobId) }, shape = RoundedCornerShape(8.dp)) { Text("Confirm") } },
+        confirmButton = { 
+            Button(
+                onClick = { if (selectedJobId.isNotEmpty()) onConfirm(selectedJobId) }, 
+                enabled = selectedJobId.isNotEmpty(),
+                shape = RoundedCornerShape(8.dp)
+            ) { Text("Confirm") } 
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
         shape = RoundedCornerShape(24.dp)
     )
