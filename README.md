@@ -5,55 +5,85 @@
 
 ---
 
-## 🚀 ฟีเจอร์ที่สำคัญ (Key Features)
+## ✅ ฟีเจอร์ทั้งหมด (Features Checklist)
 
-### 1. การจัดการสต็อกและหมวดหมู่ (Smart Inventory)
-- **Dashboard ดีไซน์ใหม่**: แสดงรายการอุปกรณ์พร้อมไอคอนแบ่งตามประเภท (Speaker, Mic, Mixer, Light, ฯลฯ)
-- **Category Filter**: กรองอุปกรณ์ตามประเภทได้ทันทีผ่านแถบ Chip ด้านบน
-- **Search System**: ค้นหาอุปกรณ์ด้วยชื่อหรือ Serial Number ได้อย่างรวดเร็ว
-- **QR Code Engine**: ทุกอุปกรณ์จะมี QR Code ของตัวเอง สามารถกดดู เซฟลงเครื่อง หรือสั่งพิมพ์ (Print) เพื่อแปะติดกับตัวอุปกรณ์ได้
-
-### 2. ระบบจัดการงานและคิวจอง (Advanced Job Management)
-- **Job Segmentation**: แบ่งสถานะงานออกเป็น 3 ระยะ:
-  - `Active`: งานที่กำลังดำเนินการอยู่ในปัจจุบัน
-  - `Upcoming`: งานในอนาคตที่จองอุปกรณ์ไว้แล้ว
-  - `Completed`: ประวัติงานที่จบไปแล้ว
-- **Automatic Booking**: เมื่อใส่อุปกรณ์ลงในงาน ระบบจะล็อคสถานะอุปกรณ์นั้นๆ ให้โดยอัตโนมัติ
-- **Revenue Overview**: สรุปยอดรวมมูลค่าอุปกรณ์หรือรายได้ในแต่ละงาน
-
-### 3. ระบบสถานะอุปกรณ์แบบ Real-time (Item Life-cycle)
-ติดตามวงจรชีวิตของอุปกรณ์ได้อย่างแม่นยำ:
-- 🟢 **Available (พร้อมใช้งาน)**: อุปกรณ์ว่างพร้อมลงงาน
-- 🔵 **Booked (จองแล้ว)**: อุปกรณ์ถูกจองสำหรับงานในอนาคต แต่ตัวยังอยู่ที่คลัง
-- 🟡 **Busy (ติดงาน)**: อุปกรณ์กำลังใช้งานอยู่ในหน้างานปัจจุบัน
-- 🔴 **Repair Pending (รอซ่อม)**: อุปกรณ์แจ้งเสียจากการ Check-in และรอช่างดำเนินการ
-- 🟠 **Repairing (กำลังซ่อม)**: อุปกรณ์อยู่ในขั้นตอนการซ่อมบำรุง
-
-### 4. ระบบซ่อมบำรุง (Maintenance & Repair Flow)
-- **Seamless Integration**: เมื่อจบงาน (Check-in) หากเลือกสถานะเป็น "ชำรุด" อุปกรณ์จะถูกส่งเข้าหน้าซ่อมบำรุงทันที
-- **Repair Tracking**: บันทึกวันที่เริ่มซ่อม, รายละเอียดอาการเสีย (Repair Note) และความคืบหน้า
-- **One-tap Restore**: เมื่อซ่อมเสร็จ สามารถกด "พร้อมใช้งาน" เพื่อคืนสถานะกลับสู่สต็อกได้ทันที
+| ฟีเจอร์ | สถานะ | ตำแหน่ง |
+| :--- | :---: | :--- |
+| **จัดการสต็อกและหมวดหมู่** | ✅ | InventoryScreen |
+| **ระบบค้นหา (Search System)** | ✅ | InventoryScreen |
+| **QR Code Generation** | ✅ | QRCodeGenerator + InventoryScreen |
+| **สั่งพิมพ์ QR Code (Print)** | ✅ | ImageSaver + PrintHelper |
+| **จัดการงานและคิวจอง (Job Management)** | ✅ | InventoryScreen (Job Dialogs) |
+| **ล็อคอุปกรณ์อัตโนมัติ (Auto Booking)** | ✅ | InventoryViewModel |
+| **ติดตามสถานะ Real-time (Life-cycle)** | ✅ | InventoryScreen (Status Badges) |
+| **ระบบแจ้งซ่อมอัตโนมัติ (Repair Flow)** | ✅ | InventoryScreen (Check-in Action) |
+| **ติดตามความคืบหน้าการซ่อม** | ✅ | InventoryScreen (Repair Tab) |
+| **สรุปรายได้/มูลค่า (Revenue Overview)** | ✅ | InventoryScreen (Job Detail) |
 
 ---
 
-## 🛠 ข้อมูลทางเทคนิค (Tech Stack)
+## 1. กลยุทธ์ UX (UX Strategy)
 
-### Core Technologies
-- **Language**: Kotlin (1.9+)
-- **UI Framework**: **Jetpack Compose** (Declarative UI)
-- **Local Database**: **Room Persistence** (Schema v12) - จัดการข้อมูลแบบ Offline 100%
-- **Architecture**: **MVVM** (Model-View-ViewModel) พร้อม StateFlow สำหรับการจัดการ State แบบ Reactive
+### เป้าหมายของแอป (App Goals)
+- **สำหรับผู้ใช้**: ช่วยให้การจัดการอุปกรณ์จำนวนมากเป็นเรื่องง่าย ลดความผิดพลาดในการจัดของลงงาน
+- **สำหรับทีมงาน**: ติดตามได้ทันทีว่าอุปกรณ์ตัวไหนอยู่ที่ใคร สถานะเป็นอย่างไร และต้องซ่อมบำรุงเมื่อไหร่
 
-### Libraries & Tools
-- **Material Design 3**: ใช้คอมโพเนนต์ล่าสุดเพื่อ UI ที่สวยงามและรองรับ Dynamic Color
-- **ZXing Library**: สำหรับการ Generate และสแกน QR Code
-- **KSP (Kotlin Symbol Processing)**: เพื่อเพิ่มประสิทธิภาพในการ Compile Room Database
-- **Coil**: สำหรับการโหลดและจัดการรูปภาพอุปกรณ์
-- **ImageSaver/PrintHelper**: ระบบจัดการไฟล์ภาพและการพิมพ์เอกสาร
+### กลุ่มเป้าหมาย (Target Audience)
+- **Production Crew**: ผู้ที่ต้องจัดเตรียมอุปกรณ์และนำออกไปหน้างาน
+- **Event Manager**: ผู้ดูแลคิวงานและการจองอุปกรณ์ในแต่ละโปรเจ็ค
+- **Maintenance Team**: ช่างที่ดูแลการซ่อมบำรุงอุปกรณ์ที่ชำรุด
+
+### Pain Points & แนวทางแก้ไข
+- **อุปกรณ์สูญหาย/หาไม่เจอ**: แก้ไขด้วยระบบ **QR Code** ประจำตัวเครื่อง สแกนเพื่อเช็คสถานะได้ทันที
+- **ของเสียแล้วไม่ได้รับการซ่อม**: แก้ไขด้วยระบบ **Seamless Repair Flow** เมื่อ Check-in แล้วแจ้งเสีย ของจะเด้งไปหน้าซ่อมทันที
+- **จองของซ้อนกัน**: แก้ไขด้วยระบบ **Automatic Booking** ที่ล็อคสถานะอุปกรณ์ตามวันที่ใน Job
 
 ---
 
-## 📁 โครงสร้างโปรเจ็ค (Project Structure)
+## 2. ผังโครงสร้างแอป (Sitemap)
+
+- **Dashboard**: หน้าหลักแสดงรายการอุปกรณ์ทั้งหมด แยกตามหมวดหมู่ (Speaker, Mic, Mixer, ฯลฯ)
+- **Inventory Detail**: รายละเอียดอุปกรณ์, เลข Serial, สถานะปัจจุบัน และ QR Code
+- **Job Management**: รายการงาน (Active, Upcoming, Completed) และการเลือกอุปกรณ์ลงงาน
+- **Maintenance Center**: รายการอุปกรณ์ที่รอซ่อม (Repair Pending) และกำลังซ่อม (Repairing)
+- **Reports/Settings**: สรุปภาพรวมและตั้งค่าระบบ
+
+---
+
+## 3. การออกแบบ UI (UI Design Visuals)
+
+- **สไตล์ (Style)**: Professional, Modern, และ Functional
+- **โทนสี (Status Colors)**:
+  - 🟢 **Available**: พร้อมใช้งาน (#4CAF50)
+  - 🔵 **Booked**: จองแล้ว (#2196F3)
+  - 🟡 **Busy**: ติดงาน (#FFEB3B)
+  - 🔴 **Repair Pending**: รอซ่อม (#F44336)
+  - 🟠 **Repairing**: กำลังซ่อม (#FF9800)
+- **ตัวอักษร (Typography)**: ใช้ Sarabun (สำหรับภาษาไทย) เพื่อความเป็นทางการและอ่านง่าย
+
+---
+
+## 🍳 ProJect Inventory — Technical Documentation
+
+### Tech Stack
+| เทคโนโลยี | รายละเอียด |
+| :--- | :--- |
+| **Language** | Kotlin (1.9+) |
+| **UI Framework** | Jetpack Compose (Declarative UI) |
+| **Architecture** | MVVM (Model-View-ViewModel) |
+| **Database** | Room Persistence (Schema v12) - Offline 100% |
+| **Image Loading** | Coil |
+| **QR Engine** | ZXing Library |
+| **Build System** | Gradle (Kotlin DSL) + KSP |
+
+### การเก็บข้อมูล (Data Storage)
+- **Local Database**: ใช้ Room จัดการข้อมูล Item, Job และ Category ทั้งหมดแบบ Offline
+- **Image Storage**: บันทึกรูปภาพ QR Code และรูปอุปกรณ์ลงใน Internal Storage ผ่าน ImageSaver
+- **State Management**: ใช้ StateFlow และ SharedFlow ใน ViewModel เพื่อจัดการสถานะแบบ Reactive
+
+---
+
+## 📁 โครงสร้างไฟล์ (File Structure)
 
 ```text
 app/src/main/java/com/example/projectinventory/
@@ -63,11 +93,11 @@ app/src/main/java/com/example/projectinventory/
 │   └── InventoryViewModel.kt    # Business Logic & Data Stream
 ├── ui/
 │   ├── screens/
-│   │   └── InventoryScreen.kt  # UI หลัก (Main Screen & Dialogs)
+│   │   └── InventoryScreen.kt  # UI หลัก (Main Screen, Tabs, Dialogs)
 │   └── theme/
-│       ├── Color.kt             # ระบบสี (Brand Colors)
-│       ├── Type.kt              # Typography (Sarabun/Sans-serif)
-│       └── Theme.kt             # Material Theme Configuration
+│       ├── Color.kt             # ระบบสี (Brand & Status Colors)
+│       ├── Type.kt              # Typography Configuration
+│       └── Theme.kt             # Material 3 Theme Setup
 └── util/
     ├── QRCodeGenerator.kt      # เครื่องมือสร้าง QR Code
     └── ImageSaver.kt           # จัดการการบันทึกภาพและระบบ Print
@@ -75,22 +105,22 @@ app/src/main/java/com/example/projectinventory/
 
 ---
 
-## 📋 ขั้นตอนการทำงานของแอป (Workflows)
+## 📋 ขั้นตอนการทำงาน (Workflows)
 
-1. **เพิ่มอุปกรณ์**: ใส่รายละเอียด ชื่อ, Serial, และหมวดหมู่
-2. **สร้างงาน**: กำหนดชื่อสถานที่ วันที่ และเลือกอุปกรณ์ที่ต้องการใช้
-3. **หน้างาน (Check-out)**: เมื่อถึงวันงาน กด Check-out เพื่อเปลี่ยนสถานะเป็น `Busy`
-4. **คืนของ (Check-in)**: เมื่อจบงาน ตรวจสอบสภาพของ หากปกติจะกลับเป็น `Available` หากเสียจะกลายเป็น `Repair Pending`
-5. **การซ่อม**: ช่างกด "เริ่มดำเนินการซ่อม" ในหน้า Repair และกด "ซ่อมเสร็จ" เมื่ออุปกรณ์พร้อมกลับไปใช้งาน
+1. **Add Inventory**: เพิ่มอุปกรณ์ใหม่เข้าระบบ พร้อมระบุหมวดหมู่และ Serial
+2. **Assign Job**: สร้างงานใหม่และเลือกอุปกรณ์ที่ต้องการใช้ ระบบจะเปลี่ยนสถานะเป็น `Booked`
+3. **Check-out**: เมื่อถึงวันงาน เปลี่ยนสถานะอุปกรณ์เป็น `Busy`
+4. **Check-in & Report**: เมื่อจบงาน ตรวจสอบสภาพ หากชำรุดระบบจะส่งเข้า **Repair Flow** ทันที
+5. **Maintain**: ช่างดำเนินการซ่อมและกด "Restore" เพื่อคืนค่ากลับเป็น `Available`
 
 ---
 
 ## ⚙️ การติดตั้งและรันโปรเจ็ค
 
-1. ติดตั้ง **Android Studio Ladybug (2024.2.1)** หรือเวอร์ชันที่ใหม่กว่า
-2. Clone Repository นี้
-3. ทำการ **Gradle Sync** เพื่อดาวน์โหลด Dependencies
-4. รันแอปพลิเคชันบน Emulator หรือ Physical Device (แนะนำ Android 10.0+ / API 29+)
+1. ติดตั้ง **Android Studio Ladybug (2024.2.1)** ขึ้นไป
+2. Clone Repository
+3. ทำการ **Gradle Sync**
+4. รันแอปบน Android 10.0+ (API 29+) เพื่อรองรับฟีเจอร์การพิมพ์และจัดการไฟล์ที่สมบูรณ์
 
 ---
-*พัฒนาโดยผู้เชี่ยวชาญ เพื่อชาว Production และ Event โดยเฉพาะ*
+*Professional Inventory Solution for Production Teams*
