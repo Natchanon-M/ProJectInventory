@@ -6,7 +6,7 @@
 ---
 ## 🎨 UI / Wireframe Design
 ออกแบบ UI ด้วย Figma:
-https://www.figma.com/design/LJp7AsSiZqJioWs7siOYi4/Wirefream?node-id=0-1&t=pNutW9QLJoLnl8Xa-1
+
 🔗 ดู Wireframe บน Figma
 
 ## ✅ ฟีเจอร์ทั้งหมด (Features Checklist)
