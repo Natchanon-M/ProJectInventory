@@ -8,7 +8,7 @@
 ## 🎨 UI / Wireframe Design
 ออกแบบ UI ด้วย Figma:
 
-🔗 [ดู Wireframe บน Figma]([https://your-figma-link.com](https://www.figma.com/design/LJp7AsSiZqJioWs7siOYi4/Wirefream?node-id=0-1&t=37tQ5arE35GkCnl5-1))
+🔗 [ดู Wireframe บน Figma](https://www.figma.com/design/LJp7AsSiZqJioWs7siOYi4/Wirefream?node-id=0-1&t=37tQ5arE35GkCnl5-1)
 
 ---
 
