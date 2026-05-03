@@ -4,6 +4,10 @@
 แอปพลิเคชัน Android ที่ออกแบบมาเพื่อแก้ปัญหาความวุ่นวายในการจัดการอุปกรณ์ (Inventory) และการจัดสรรคิวงาน (Job Management) โดยเน้นความง่ายในการใช้งาน (UX) และความสวยงามทันสมัย (Modern UI) พร้อมระบบติดตามสถานะแบบละเอียดและระบบซ่อมบำรุงในตัว
 
 ---
+## 🎨 UI / Wireframe Design
+ออกแบบ UI ด้วย Figma:
+https://www.figma.com/design/LJp7AsSiZqJioWs7siOYi4/Wirefream?node-id=0-1&t=pNutW9QLJoLnl8Xa-1
+🔗 ดู Wireframe บน Figma
 
 ## ✅ ฟีเจอร์ทั้งหมด (Features Checklist)
 
